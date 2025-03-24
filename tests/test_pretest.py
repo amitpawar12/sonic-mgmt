@@ -152,6 +152,35 @@ def test_update_testbed_metadata(duthosts, tbinfo, fanouthosts):
     prepare_autonegtest_params(duthosts, fanouthosts)
 
 
+def test_update_snappi_testbed_metadata(duthosts, tbinfo, request):
+    """
+    Prepare metadata json for snappi tests, will be stored in metadata/snappi_tests/<tb>.json
+    """
+    pytest_require("tgen" in request.config.getoption("--topology"),
+                   "Skip snappi metadata generation for non-tgen testbed")
+    metadata = {}
+    tbname = tbinfo['conf-name']
+    pytest_require(tbname, "skip test due to lack of testbed name.")
+    for dut in duthosts:
+        dutinfo = collect_dut_info(dut)
+        asic_to_interface = {}
+        for asic in dut.asics:
+            interfaces = dut.show_interface(command="status", namespace=asic.namespace)["ansible_facts"]["int_status"]
+            asic_to_interface[asic.namespace] = list(interfaces.keys())
+        dutinfo.update({"asic_to_interface": asic_to_interface})
+        metadata[dut.hostname] = dutinfo
+    folder = 'metadata/snappi_tests'
+    filepath = os.path.join(folder, tbname + '.json')
+    info = {tbname: metadata}
+    try:
+        if not os.path.exists(folder):
+            os.mkdir(folder)
+        with open(filepath, 'w') as yf:
+            json.dump(info, yf, indent=4)
+    except IOError as e:
+        logger.warning('Unable to create file {}: {}'.format(filepath, e))
+
+
 def test_disable_rsyslog_rate_limit(duthosts, enum_dut_hostname):
     duthost = duthosts[enum_dut_hostname]
     features_dict, succeed = duthost.get_feature_status()
